@@ -43,3 +43,5 @@
 // Set Server Port
     let serverPort = 3000;
     server.listen(serverPort, () => console.log("Server listen listening port " + serverPort + "."));
+
+    console.log(text)
