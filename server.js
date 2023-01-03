@@ -111,5 +111,5 @@
           });
     }
 // Set Server Port
-    let serverPort = 3000;
+    let serverPort = process.env.PORT || 3000;
     server.listen(serverPort, () => console.log("Server runing on port " + serverPort + "."));
