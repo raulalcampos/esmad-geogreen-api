@@ -3,7 +3,7 @@ const nodemailer = require("nodemailer");
 
 // function to send some Email
 async function send(type, to, name, subject, message){
-    // types: 0: account checker, 1: recover password
+    // types: 0: account checker, 1: recover password; 2: password updated; 3: Deleted Account
     let transporter = nodemailer.createTransport({
         host: 'smtp.hostinger.com',
         port: 465,
@@ -40,7 +40,44 @@ async function send(type, to, name, subject, message){
             subject: subject,
             text : message
         };
-    }
+    } else if (type == 2){
+        mailOptions = {
+            from: {
+                name: name,
+                address: 'dtam-pi2@esmad.raulcampos.net'
+            },
+            to: to,
+            subject: subject,
+            html: `<p> Hello, ${message.username}! </p>
+            <p> Your GeoGreen account security setthings has been successfully updated. </p>
+            <p> This is an automatic email, please do not reply. </p>
+            <p> The GeoGreen Team 💚 ! </p>`
+        };
+    } else if (type == 3){
+        mailOptions = {
+            from: {
+                name: name,
+                address: 'dtam-pi2@esmad.raulcampos.net'
+            },
+            to: to,
+            subject: subject,
+            html: `<p> Hello, ${message.username}! </p>
+            <p> Your GeoGreen account has been successfully deleted. </p>
+            <p> Thank you so much for all the time you spent with us, we will be here for you whenever you want to come back! 🤗 </p>
+            <p> This is an automatic email, please do not reply. </p>
+            <p> The GeoGreen Team 💚 ! </p>`
+        };
+    } else {
+        mailOptions = {
+            from: {
+                name: name,
+                address: 'dtam-pi2@esmad.raulcampos.net'
+            },
+            to: to,
+            subject: subject,
+            text : message
+        };
+    };
     transporter.sendMail(mailOptions, function (error, sucess) {
         if(error){
           console.log(error);
@@ -51,5 +88,6 @@ async function send(type, to, name, subject, message){
         }
       });
 }
+
 // export functions
 module.exports = { send }
