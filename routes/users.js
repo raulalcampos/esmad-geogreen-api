@@ -42,7 +42,7 @@ router.get("/", async (request, response) => {
 });
 
 // Register
-router.post("/register", 
+router.post("/", 
     [
         body('name').notEmpty().escape(),
         body('email').isEmail(), 
@@ -57,6 +57,7 @@ router.post("/register",
             let hashedPassword = await security.hashPassword(request.body.password, 10);
             let verificationCode = randomCode.generate(10);
             const [result] = await pool.query(`INSERT INTO users VALUES (NULL, '${request.body.name}', '${request.body.email}', '${hashedPassword}', 0, '${verificationCode}', '${request.body.picture}', 0)`);
+            await pool.query(`INSERT INTO usersnotifications VALUES ('${result.insertId}', 0, 0, 0)`);
             email.send(0, request.body.email, "GeoGreen - Account Checker", "Check your new account", {username: request.body.name, userId: result.insertId, verificationCode: verificationCode});
             response.status(201).json({message: "sucess", info: {id: result.insertId, email: request.body.email}});
             console.log(`New user registred with email ${request.body.email}.`)
@@ -82,7 +83,7 @@ router.post("/login",
         if(userDB != 0){
             const compare = await security.compare(request.body.password, userDB[0].password);
             if(compare == true){
-                const token = await security.generate({email: request.body.email}, "15d");
+                const token = await security.generate({id: userDB[0].id, email: request.body.email}, "15d");
                 response.status(200).json({message: "sucess", token: token});
             } else {
                 response.status(401).json({message: "error", info: "The entered password is wrong."});
@@ -136,7 +137,37 @@ router.put("/",
                 response.status(403).json({message: "error", info: "Invalid token, please login again."});
             }
         } else {
-            response.status(401).json({message: "error", info: "No token found for edit profile settings."});
+            response.status(401).json({message: "error", info: "No token found for edit Profile Settings."});
+        }
+    } else {
+        response.status(400).json({message: "error", info: "Bad Resquest. Please check the documentation of the API.", errors: errors.array()});
+    }
+    // catch some error
+    handle.error();
+});
+
+// Edit notifications settinges
+router.put("/notifications",
+    [
+        body('notification1').isNumeric(),
+        body('notification2').isNumeric(),
+        body('notification3').isNumeric(),
+    ],
+    async (request, response) => {
+    const errors = validationResult(request);
+    if(errors.isEmpty()){
+        const bearerHeader = request.headers['authorization'];
+        if(typeof bearerHeader !== "undefined"){
+            const token = bearerHeader.split(' ')[1];
+            const valid = await security.verify(token);
+            if(valid){
+                await pool.query(`UPDATE usersnotifications SET notification1 = '${request.body.notification1}', notification2 = '${request.body.notification2}', notification3 = '${request.body.notification3}' WHERE id = '${valid.id}'`);
+                response.status(200).json({message: "sucess", info: "Notifications Settings successfully edited."});
+            } else {
+                response.status(403).json({message: "error", info: "Invalid token, please login again."});
+            }
+        } else {
+            response.status(401).json({message: "error", info: "No token found for edit Notifications Settings."});
         }
     } else {
         response.status(400).json({message: "error", info: "Bad Resquest. Please check the documentation of the API.", errors: errors.array()});
@@ -167,7 +198,7 @@ router.put("/security",
                 response.status(403).json({message: "error", info: "Invalid token, please login again."});
             }
         } else {
-            response.status(401).json({message: "error", info: "No token found for edit security setthings."});
+            response.status(401).json({message: "error", info: "No token found for edit Security Setthings."});
         }
     } else {
         response.status(400).json({message: "error", info: "Bad Resquest. Plase check the documentation of the API.", errors: errors.array()});
@@ -186,6 +217,7 @@ router.delete("/", async (request, response) => {
             const [userDB] = await pool.query(`SELECT * FROM users WHERE email = "${valid.email}"`);
             if(userDB != ""){
                 email.send(3, valid.email, "GeoGreen - Account Manager", "Account Deleted", {username: userDB[0].name});
+                await pool.query(`DELETE FROM usersnotifications WHERE id = '${valid.id}'`);
                 await pool.query(`DELETE FROM users WHERE email = '${valid.email}'`);
                 response.status(200).json({message: "sucess", info: "Account Deleted Successfully."});
             } else {
