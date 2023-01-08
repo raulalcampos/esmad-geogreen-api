@@ -2,15 +2,24 @@
 const express = require("express");
 const server = express();
 const pool = require("./database").pool;
+const serverInfo = require("./routes/serverinfo");
 const users = require("./routes/users");
-const serverInfo = require("./routes/status");
+const statistics = require("./routes/statistics")
+const contact = require("./routes/contact")
+
 server.use(express.json());
 
 // "Server Info"
-server.use('/info/status', serverInfo);
+server.use('/server', serverInfo);
 
 // "Users"
 server.use('/users', users);
+
+// "Statistics"
+server.use('/statistics', statistics);
+
+// "contact"
+server.use('/contact', contact);
 
 // Error Handling
 server.use((error, request, response, next) => {

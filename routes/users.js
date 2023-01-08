@@ -5,8 +5,8 @@ const pool = require("../database").pool;
 const email = require('../functions/email');
 const randomCode = require('../functions/randomCode');
 const security = require('../functions/security');
-const handle = require('../functions/errorHandling');
 const { body, validationResult } = require('express-validator');
+const handle = require('../functions/errorHandling');
 
 // List users
 router.get("/", async (request, response) => {
@@ -47,19 +47,33 @@ router.post("/",
         body('name').notEmpty().escape(),
         body('email').isEmail(), 
         body('password').isLength({ min: 5 }),
-        body('picture').notEmpty().escape()
+        body('picture').notEmpty().escape(),
+        body('notification1').isNumeric(),
+        body('notification2').isNumeric(),
+        body('notification3').isNumeric()
     ],
     async (request, response) => {
     const errors = validationResult(request);
     if(errors.isEmpty()){
+        // check if user already existis
         const [userDB] = await pool.query(`SELECT * FROM users WHERE email = "${request.body.email}"`);
         if(userDB == 0){
+            // hash password
             let hashedPassword = await security.hashPassword(request.body.password, 10);
+            // generate verificationCode
             let verificationCode = randomCode.generate(10);
+            // register user
             const [result] = await pool.query(`INSERT INTO users VALUES (NULL, '${request.body.name}', '${request.body.email}', '${hashedPassword}', 0, '${verificationCode}', '${request.body.picture}', 0)`);
-            await pool.query(`INSERT INTO usersnotifications VALUES ('${result.insertId}', 0, 0, 0)`);
+            // register user notifications settings
+            await pool.query(`INSERT INTO usersnotifications VALUES ('${result.insertId}', '${request.body.notification1}', '${request.body.notification2}', '${request.body.notification3}')`);
+            // register user statistics
+            await pool.query(`INSERT INTO userstatistics (id) VALUES (${result.insertId})`);
+            // generate token
+            const token = await security.generate({id: result.insertId, email: request.body.email}, "15d");
+            // send verification email
             email.send(0, request.body.email, "GeoGreen - Account Checker", "Check your new account", {username: request.body.name, userId: result.insertId, verificationCode: verificationCode});
-            response.status(201).json({message: "sucess", info: {id: result.insertId, email: request.body.email}});
+            
+            response.status(201).json({message: "sucess", info: {email: request.body.email}, token: token});
             console.log(`New user registred with email ${request.body.email}.`)
         } else {
             response.status(406).json({message: "error", info: "There is already a user with that email registered in our database. Please use another email to register."});
@@ -79,12 +93,23 @@ router.post("/login",
     async (request, response) => {
     const errors = validationResult(request);
     if(errors.isEmpty()){
+        // get user info from database
         const [userDB] = await pool.query(`SELECT * FROM users WHERE email = "${request.body.email}"`);
         if(userDB != 0){
+            // generate token
             const compare = await security.compare(request.body.password, userDB[0].password);
             if(compare == true){
+                // generate token
                 const token = await security.generate({id: userDB[0].id, email: request.body.email}, "15d");
-                response.status(200).json({message: "sucess", token: token});
+                // get user notifications info from database
+                const [notifications] = await pool.query(`SELECT * FROM usersnotifications WHERE id = "${userDB[0].id}"`);
+                // get user statistics info from database
+                const [statistics] = await pool.query(`SELECT * FROM userstatistics WHERE id = "${userDB[0].id}"`);
+                // hide user id to the outside
+                let statisticsWithOutId = statistics.shift();
+                delete statisticsWithOutId.id
+
+                response.status(200).json({message: "sucess", userinfo: {name: userDB[0].name, picture: userDB[0].picture, notifications: {notification1: notifications[0].notification1, notification2: notifications[0].notification2, notification3: notifications[0].notification3}, statistics: statisticsWithOutId}, token: token});
             } else {
                 response.status(401).json({message: "error", info: "The entered password is wrong."});
             }
@@ -116,6 +141,25 @@ router.delete("/logout", async (request, response) => {
     // catch some error
     handle.error();
 });
+
+// Check token validity
+router.get("/verify", async (request, response) => {
+    const bearerHeader = request.headers['authorization'];
+    if(typeof bearerHeader !== "undefined"){
+        const token = bearerHeader.split(' ')[1];
+        const valid = await security.verify(token);
+        if(valid){
+            response.status(200).json({message: "sucess", info: "This token is valid."});
+        } else {
+            response.status(403).json({message: "error", info: "Invalid token, please login again."});
+        }
+    } else {
+        response.status(401).json({message: "error", info: "No token found for verify veracity."});
+    }
+    // catch some error
+    handle.error();
+});
+
 
 // Edit profile settinges
 router.put("/",
@@ -151,7 +195,7 @@ router.put("/notifications",
     [
         body('notification1').isNumeric(),
         body('notification2').isNumeric(),
-        body('notification3').isNumeric(),
+        body('notification3').isNumeric()
     ],
     async (request, response) => {
     const errors = validationResult(request);
@@ -216,9 +260,17 @@ router.delete("/", async (request, response) => {
         if(valid){
             const [userDB] = await pool.query(`SELECT * FROM users WHERE email = "${valid.email}"`);
             if(userDB != ""){
+                // Send Alert email ("your account are deleted")
                 email.send(3, valid.email, "GeoGreen - Account Manager", "Account Deleted", {username: userDB[0].name});
+                // Delete notifications of user
                 await pool.query(`DELETE FROM usersnotifications WHERE id = '${valid.id}'`);
+                // Delete statistics of user
+                await pool.query(`DELETE FROM userstatistics WHERE id = '${valid.id}'`);
+                // Delete user
                 await pool.query(`DELETE FROM users WHERE email = '${valid.email}'`);
+                // Insert current token in black list of database to prever mau uso da API
+                await pool.query(`INSERT INTO invalidtokens VALUES ('${token}')`);
+
                 response.status(200).json({message: "sucess", info: "Account Deleted Successfully."});
             } else {
                 response.status(404).json({message: "error", info: "This user has already been deleted."});
