@@ -251,6 +251,61 @@ router.put("/security",
     handle.error();
 });
 
+// Recover password
+// Send a link to recover the password
+router.put("/security/recover/sendcode",
+    [
+        body('email').isEmail()
+    ],
+    async (request, response) => {
+    const errors = validationResult(request);
+    if(errors.isEmpty()){
+        const [userDB] = await pool.query(`SELECT * FROM users WHERE email = "${request.body.email}"`);
+        if(userDB == ""){
+            response.status(404).json({message: "error", info: "User not found in our database."});
+        } else {
+            let verificationCode = randomCode.generate(10);
+            await pool.query(`UPDATE users SET verificationcode = '${verificationCode}' WHERE email = '${request.body.email}'`);
+            response.status(200).json({message: "sucess", info: "Ecopoint successfully updated."});
+            email.send(1, request.body.email, "GeoGreen - Security Settings", "Recover Password", {username: userDB[0].name, userId: userDB[0].id, verificationCode: verificationCode});
+        }
+    } else {
+        response.status(400).json({message: "error", info: "Bad Resquest. Plase check the documentation of the API.", errors: errors.array()});
+    }
+    // catch some error
+    handle.error();
+});
+// Recover with code
+router.put("/security/recover",
+    [
+        body('id').notEmpty().escape(),
+        body('verificationCode').isLength({min: 5 }).escape(),
+        body('password').isLength({ min: 5 })
+    ],
+    async (request, response) => {
+    const errors = validationResult(request);
+    if(errors.isEmpty()){
+        const [userDB] = await pool.query(`SELECT * FROM users WHERE id = "${request.body.id}"`);
+        if(userDB == ""){
+            response.status(404).json({message: "error", info: "User not found in our database."});
+        } else {
+            if(userDB[0].verificationcode == request.body.verificationCode){
+                let hashedPassword = await security.hashPassword(request.body.password, 10);
+                await pool.query(`UPDATE users SET password = '${hashedPassword}' WHERE id = '${request.body.id}'`);
+                response.status(200).json({message: "sucess", info: "Password successfully updated."});
+                email.send(2, userDB[0].email, "GeoGreen - Security Alert", "Updated Password", {username: userDB[0].name});
+            } else {
+                response.status(401).json({message: "error", info: "Wrong recovery code."});
+            }
+        }
+    } else {
+        response.status(400).json({message: "error", info: "Bad Resquest. Plase check the documentation of the API.", errors: errors.array()});
+    }
+    // catch some error
+    handle.error();
+});
+
+
 // Delete
 router.delete("/", async (request, response) => {
     const bearerHeader = request.headers['authorization'];

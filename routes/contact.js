@@ -18,7 +18,7 @@ router.post("/",
     const errors = validationResult(request);
     const date = new Date;
     if(errors.isEmpty()){
-        // 
+        // insert message content into database
         await pool.query(`INSERT INTO contacts VALUES (NULL, '${request.body.name}', '${request.body.email}', '${request.body.subject}', '${request.body.message}', '${date}')`);
         // send email to notify admin
         email.send(4, "mail@raulcampos.net", "GeoGreen - Contact Notifier", "You have a new message", {fromUser: request.body.name, emailUser: request.body.email, subject: request.body.subject, message: request.body.message, time: {day: date.getDate(), month: date.getUTCMonth() + 1, year: date.getUTCFullYear(), hour: date.getHours(), minute: date.getMinutes()}});

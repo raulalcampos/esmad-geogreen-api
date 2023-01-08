@@ -27,8 +27,8 @@ async function send(type, to, name, subject, message){
             subject: subject,
             html: `<p> Hello, ${message.username}! </p>
             <p> Thank you very much for creating an GeoGreen account! </p>
-            <p> In order to use our application, please verify your account by clicking on this link: <u>https://esmad.raulcampos.net/dtam-pi2/checkaccount?userid=${message.userId}&verificationcode=${message.verificationCode}</u> ! </p>
-            <p></p>
+            <p> In order to use our application, please verify your account by clicking on <a href="https://esmad.raulcampos.net/dtam-pi2/checkaccount?userid=${message.userId}&verificationcode=${message.verificationCode}"> this limk</a>! </p>
+            <p> Can't click? Copy and paste the following text into your browser: <u>https://esmad.raulcampos.net/dtam-pi2/checkaccount?userid=${message.userId}&verificationcode=${message.verificationCode}</u> </p>
             <p><strong> The GeoGreen Team 💚 ! </strong></p>`
         };
     } else if (type == 1){
@@ -39,7 +39,11 @@ async function send(type, to, name, subject, message){
             },
             to: to,
             subject: subject,
-            text : message
+            html: `<p> Hello, ${message.username}! </p>
+            <p> We have received a security password recovery request for your account. <u>If you haven't done so, please ignore this email</u>. </p>
+            <p> To set a new password, please follow the steps by clicking on <a href="https://esmad.raulcampos.net/dtam-pi2/recoverpassword?userid=${message.userId}&verificationcode=${message.verificationCode}"> this link</a>! </p>
+            <p> Can't click? Copy and paste the following text into your browser: <u>https://esmad.raulcampos.net/dtam-pi2/recoverpassword?userid=${message.userId}&verificationcode=${message.verificationCode}</u> </p>
+            <p><strong> The GeoGreen Team 💚 ! </strong></p>`
         };
     } else if (type == 2){
         mailOptions = {

@@ -4,13 +4,13 @@ const server = express();
 const pool = require("./database").pool;
 const serverInfo = require("./routes/serverinfo");
 const users = require("./routes/users");
-const statistics = require("./routes/statistics")
-const contact = require("./routes/contact")
-
+const statistics = require("./routes/statistics");
+const contact = require("./routes/contact");
+const ecopoints = require("./routes/ecopoints");
 server.use(express.json());
 
 // "Server Info"
-server.use('/server', serverInfo);
+server.use('/', serverInfo);
 
 // "Users"
 server.use('/users', users);
@@ -18,8 +18,11 @@ server.use('/users', users);
 // "Statistics"
 server.use('/statistics', statistics);
 
-// "contact"
+// "Contact"
 server.use('/contact', contact);
+
+// "Ecopoints"
+server.use('/ecopoints', ecopoints);
 
 // Error Handling
 server.use((error, request, response, next) => {
